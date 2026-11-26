@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kartpalast Auslastung</title>
+<meta name="description" content="Wie voll ist der Kartpalast München? Belegung Grand Prix 30 für heute und die nächsten 7 Tage, alle 15 Minuten aktualisiert.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Kartpalast München – Streckenauslastung">
+<meta property="og:description" content="Belegung Grand Prix 30 für heute und die nächsten 7 Tage – Raceway 1–3, alle 15 Minuten aktualisiert.">
+<meta property="og:image" content="https://postrecht-lab.github.io/kartpalast/thumb.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://postrecht-lab.github.io/kartpalast/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: sachlich und schnell, wie der Zeitenmonitor an der Boxenmauer
+   IDEA: Starterliste des Tages – Läufe untereinander, Ampelbalken für die Belegung
+   PICTURE: die Tagesliste selbst, oben Tagesreiter und Summen je Raceway
+   COLOUR and TYPE: Asphalt, Weiß, Curb-Rot, TeamSport-Blau; Barlow Condensed + Barlow
+   LAYOUT: Kopf mit Stand, Tagesreiter, Summen, Liste; mobil eine Spalte */
+:root{color-scheme:light dark;--bg:light-dark(#eceae6,#121316);--panel:light-dark(#fff,#1d1f23);--ink:light-dark(#141518,#f1f0ed);--mut:light-dark(#5d6168,#a3a7ad);--line:light-dark(#e2dfda,#2e3136);--track:light-dark(#e7e5e1,#2b2e33);--red:#d7261e;--blue:light-dark(#0a6ebd,#4ea3e6);--ok:#1e8e3e;--mid:#e38a00;--hi:#d93025}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+.curb{height:12px;background:repeating-linear-gradient(90deg,var(--red) 0 32px,#fff 32px 64px)}
+.top{background:#17181b;color:#f4f3f0;padding:18px max(4vw,16px) 16px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font:700 clamp(30px,6vw,44px)/1.05 "Barlow Condensed",sans-serif;margin:0;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;color:#b9bcc1;font-size:15px}
+.meta b{color:#fff}
+.warn{margin-top:10px;background:#5a1a16;color:#ffd9d5;border-radius:8px;padding:8px 12px;font-size:15px}
+.days{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding:14px max(4vw,16px);background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+.days button{flex:none;scroll-snap-align:start;min-height:52px;min-width:74px;padding:6px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:600 15px Barlow,sans-serif;cursor:pointer;line-height:1.15}
+.days button small{display:block;font-weight:500;color:var(--mut);font-size:13px}
+.days button[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:#fff}
+.days button[aria-pressed=true] small{color:#e6f0fa}
+button:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+main{padding:16px max(4vw,16px) 40px}
+.sums{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.sum{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.sum .t{font:700 18px "Barlow Condensed",sans-serif}
+.sum .v{font-size:15px;color:var(--mut)}.sum .v b{color:var(--ink);font-size:20px}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.time{font:700 24px/1 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums}
+.info{display:flex;flex-direction:column;gap:5px}
+.bar{height:10px;background:var(--track);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;border-radius:5px}
+.tr{font-size:14px;color:var(--mut);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.tr .rw{font-weight:600;color:var(--blue)}
+.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.num b{font-size:20px}.num small{display:block;color:var(--mut);font-size:13px}
+.st{font-size:13px;color:var(--mut)}
+.row.old{opacity:.6}.row.gone .time{text-decoration:line-through;text-decoration-color:var(--hi)}
+.row.gap{grid-template-columns:64px minmax(0,1fr);padding:7px 14px;color:var(--mut);font-size:14px;background:repeating-linear-gradient(135deg,transparent 0 8px,var(--track) 8px 9px)}
+.row.gap .time{font-size:18px;color:var(--mut)}
+select{font:500 14px Barlow,sans-serif;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);padding:2px 4px;min-height:30px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--mut);margin:14px 2px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.empty{padding:28px 16px;text-align:center;color:var(--mut)}
+details{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px 16px}
+summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+details p,details li{color:var(--mut);font-size:15px;max-width:68ch}
+@media(max-width:520px){.row{grid-template-columns:52px minmax(0,1fr) auto;gap:4px 10px}.time{font-size:21px}}
+.live{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 16px 16px}
+.live h2{font:700 24px/1.1 "Barlow Condensed",sans-serif;margin:12px 0 6px}
+.live p,.live li{font-size:15px;max-width:68ch}.live ol{padding-left:22px}.live li{margin-bottom:8px}
+.live button{min-height:44px;padding:0 16px;border-radius:10px;border:0;background:var(--red);color:#fff;font:600 16px Barlow,sans-serif}
+#cps{font-size:14px;color:var(--mut)}
+#bmc{width:100%;margin-top:10px;font:12px/1.3 ui-monospace,Menlo,monospace;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--mut)}
+@media(prefers-reduced-motion:no-preference){.bar i{animation:g .8s ease-out}@keyframes g{from{width:0}}}
+</style></head><body>
+<div class="curb"></div>
+<header class="top"><div class="wrap">
+ <h1>Kartpalast München – Auslastung Grand Prix 30</h1>
+ <div class="meta" id="meta">Lade Daten …</div>
+ <div id="warn"></div>
+</div></header>
+<nav class="days" id="days" aria-label="Tag wählen"></nav>
+<main><div class="wrap">
+ <div class="sums" id="sums"></div>
+ <div class="list" id="list"><div class="empty">Lade Daten …</div></div>
+ <div class="legend"><span><i style="background:var(--ok)"></i>unter 60 %</span><span><i style="background:var(--mid)"></i>60–89 %</span><span><i style="background:var(--hi)"></i>ab 90 %</span><span>Durchgestrichen: nicht mehr buchbar</span><span>* Strecke vermutet, noch nicht bestätigt</span></div>
+ <details><summary>So entstehen die Zahlen</summary>
+  <p>Alle 15 Minuten wird automatisch die öffentliche Online-Buchung des Kartpalast (SMS-Timing) für heute und die nächsten 7 Tage ausgelesen. Neu laden der Seite zeigt nur den zuletzt gespeicherten Stand – oben steht, von wann er ist. „Gebucht“ ist die Kapazität eines Laufs minus der dort angezeigten freien Plätze.</p>
+  <ul>
+   <li>Ausgebuchte Läufe zeigt das Buchungssystem nicht an. War ein Lauf früher sichtbar und fehlt jetzt, erscheint er durchgestrichen mit dem letzten bekannten Stand.</li>
+   <li>Lücken zwischen den Läufen (schraffiert): Dort wurde nie ein buchbarer Lauf angeboten – entweder ausgebucht oder kein Lauf geplant.</li>
+   <li>Bereits gestartete Läufe des heutigen Tages bleiben mit dem letzten Stand sichtbar.</li>
+   <li>Das Buchungssystem nennt keine Streckennamen, nur interne Nummern. Raceway 3 ist vom Kartpalast telefonisch bestätigt. Raceway 1 und 2 sind vermutet (mit * markiert): Die Nummer mit den meisten Läufen gilt als Raceway 1, die zweite als Raceway 2.</li>
+   <li>Alle Zahlen stammen ausschließlich aus der Online-Buchung (SMS-Timing). Telefonische oder exklusive Buchungen erscheinen dort manchmal erst später.</li>
+  </ul>
+ </details>
+</div></main>
+<div class="curb"></div>
+<script>
+{
+ const WD=['So','Mo','Di','Mi','Do','Fr','Sa'],OPTS=['Raceway 1','Raceway 2','Raceway 3'];
+ const $=id=>document.getElementById(id);
+ const esc=t=>String(t).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+ let data=null,sel=null;
+ const trackOf=id=>((data.tracks||{})[id]||'Strecke unbekannt')+((data.guessed||[]).includes(id)?'*':'');
+ const noteOf=(t,id)=>(data.notes||{})[sel+'|'+t+'|'+id]||'';
+ const col=p=>p>=.9?'var(--hi)':p>=.6?'var(--mid)':'var(--ok)';
+ const dlabel=d=>{const x=new Date(d+'T12:00');return [WD[x.getDay()],x.getDate()+'.'+(x.getMonth()+1)+'.']};
+ const hm=s=>s.slice(11,16);
+
+ function days(){
+  const today=data.updated.slice(0,10);
+  const ks=Object.keys(data.slots).sort();
+  if(!sel||!ks.includes(sel))sel=ks.includes(today)?today:ks[0];
+  $('days').innerHTML=ks.map(k=>{const [w,d]=dlabel(k);return `<button type="button" data-d="${esc(k)}" aria-pressed="${k===sel}">${k===today?'Heute':w}<small>${d}</small></button>`}).join('');
+ }
+
+ function list(){
+  const day=data.slots[sel]||{},upd=data.updated;
+  const rows=Object.entries(day).map(([k,v])=>{const [t,id]=k.split('|');return {t,id,cap:v[0],free:v[1],seen:v[2]}}).sort((a,b)=>a.t<b.t?-1:a.t>b.t?1:0);
+  if(!rows.length){$('list').innerHTML='<div class="empty">Für diesen Tag sind keine Läufe bekannt.</div>';$('sums').innerHTML='';return}
+  const per={};
+  rows.forEach(r=>{const k=trackOf(r.id);per[k]=per[k]||[0,0,0];per[k][0]+=noteOf(r.t,r.id)?r.cap:r.cap-r.free;per[k][1]+=r.cap;per[k][2]++});
+  const tot=rows.reduce((a,r)=>[a[0]+(noteOf(r.t,r.id)?r.cap:r.cap-r.free),a[1]+r.cap],[0,0]);
+  $('sums').innerHTML=`<div class="sum"><div class="t">Gesamt</div><div class="v"><b>${tot[0]}</b> / ${tot[1]} gebucht · ${rows.length} Läufe</div></div>`+
+   Object.keys(per).sort().map(k=>`<div class="sum"><div class="t">${esc(k)}</div><div class="v"><b>${per[k][0]}</b> / ${per[k][1]} · ${per[k][2]} Läufe</div></div>`).join('');
+  const toMin=t=>+t.slice(0,2)*60+ +t.slice(3);
+  let html='',prev=null;
+  rows.forEach(r=>{
+   if(prev!==null){for(let m=toMin(prev)+30;m<toMin(r.t);m+=30){const t=String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');if(!rows.some(x=>x.t===t))html+=`<div class="row gap"><div class="time">${t}</div><div>kein buchbarer Lauf – ausgebucht oder nicht geplant</div></div>`}}
+   prev=r.t;
+   const note=noteOf(r.t,r.id),free=note?0:r.free,b=r.cap-free,p=r.cap?b/r.cap:0,cur=r.seen===upd,started=(sel+'T'+r.t)<upd;
+   let cls='',st='';
+   if(!cur&&started){cls='old';st='gestartet · letzter Stand '+hm(r.seen)+' Uhr'}
+   else if(!cur){cls='gone';st='nicht mehr buchbar – vermutlich ausgebucht · Stand '+hm(r.seen)+' Uhr'}
+   else if(started){cls='old';st='läuft bereits'}
+   if(note)st=note+(st?' · '+st:'');
+   const trackHtml=`<span class="rw">${esc(trackOf(r.id))}</span>`;
+   html+=`<div class="row ${cls}"><div class="time">${r.t}</div><div class="info"><div class="bar"><i style="width:${Math.round(p*100)}%;background:${col(p)}"></i></div><div class="tr">${trackHtml}<span>${Math.round(p*100)} %</span></div>${st?`<div class="st">${st}</div>`:''}</div><div class="num"><b>${b}</b> / ${r.cap}<small>${free} frei</small></div></div>`;
+  });
+  $('list').innerHTML=html;
+ }
+
+ function meta(){
+  const u=new Date(data.updated);
+  const ageH=(Date.now()-u.getTime())/36e5;
+  $('meta').innerHTML=`<span>Stand: <b>${u.getDate()}.${u.getMonth()+1}. ${hm(data.updated)} Uhr</b></span><span>Aktualisierung alle 15 Minuten</span><span>${Object.keys(data.slots).length} Tage</span>`;
+  $('warn').innerHTML=ageH>1?`<div class="warn">Die Daten sind älter als ${Math.floor(ageH*60)} Minuten – die automatische Aktualisierung läuft nachts nicht (ca. 23–6 Uhr) oder hakt gerade.</div>`:'';
+ }
+
+ function render(){if(!data)return;meta();days();list()}
+
+ $('days').addEventListener('click',e=>{const b=e.target.closest('button[data-d]');if(!b)return;sel=b.dataset.d;days();list()});
+
+ async function load(){
+  try{const r=await fetch('data.json?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;data=await r.json();render()}
+  catch(e){if(!data){$('list').innerHTML='<div class="empty">Daten konnten nicht geladen werden. Bitte Seite neu laden.</div>';$('meta').textContent=''}}
+ }
+ load();
+ setInterval(load,10*60*1000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+}
+</script>
+</body></html>
