@@ -36,6 +36,24 @@ page.on("response", async (r) => {
 });
 
 await page.goto(URL, { waitUntil: "networkidle", timeout: 60000 });
+// Cookie-Hinweis schließen (datensparsam: ablehnen / nur notwendige)
+async function dismissConsent() {
+  const rx = /^(alle ablehnen|ablehnen|nur notwendige|nur essenzielle|notwendige cookies|decline|reject all|reject)/i;
+  for (const f of page.frames()) {
+    try {
+      const btns = f.locator("button, a[role=button], [role=button]");
+      const n = await btns.count();
+      for (let i = 0; i < n; i++) {
+        const b = btns.nth(i);
+        const t = ((await b.innerText().catch(() => "")) || "").trim();
+        if (rx.test(t) && await b.isVisible().catch(() => false)) { await b.click({ timeout: 3000 }).catch(() => {}); if (DEBUG) console.log("CONSENT", JSON.stringify(t)); return true; }
+      }
+    } catch {}
+  }
+  return false;
+}
+await page.waitForTimeout(1500);
+await dismissConsent();
 const found = await page.waitForFunction((prod) => {
   const a = [...document.querySelectorAll("a")].find(a => /Buche jetzt/.test(a.textContent) && a.closest("sms-product-item")?.querySelector("h1,h2,h3,h4")?.textContent.trim() === prod);
   if (a) { a.click(); return true; }
@@ -67,7 +85,11 @@ for (let i = 0; i < DAYS; i++) {
       await page.locator(".mat-calendar-next-button").click({ timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(400);
     }
-  } catch (e) { res = "fehler: " + String(e.message || e).split("\n")[0].slice(0, 80); }
+  } catch (e) {
+    const msg = String(e.message || e);
+    res = "fehler: " + ((msg.match(/<[^>]+> (?:from <[^>]+> subtree )?intercepts pointer events/) || [msg.split("\n")[0]])[0]).slice(0, 160);
+    await dismissConsent();
+  }
   if (res === "ok") { for (let w = 0; w < 40 && !(capT[key] >= t0); w++) await page.waitForTimeout(250); }
   log.push(`${key}:${res}${cap[key] ? "/" + cap[key].length : ""}`);
   if (DEBUG) { console.log("TAG", key, label, res, Object.keys(cap).join(",")); await page.screenshot({ path: `debug-${i}.png` }); }
