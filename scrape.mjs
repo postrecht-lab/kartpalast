@@ -18,7 +18,8 @@ const berlin = (d = new Date()) => {
 
 const cap = {}, capT = {};
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ locale: "de-DE", timezoneId: "Europe/Berlin", viewport: { width: 1280, height: 900 } });
+const ctx = await browser.newContext({ locale: "de-DE", timezoneId: "Europe/Berlin", viewport: { width: 1280, height: 900 },
+  userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" });
 const page = await ctx.newPage();
 const DEBUG = !!process.env.KART_DEBUG;
 page.on("request", (q) => { if (DEBUG && /sms-timing\.com\/api/.test(q.url())) console.log("REQ", q.method(), q.url().replace(/^https:\/\/[^/]+/, ""), (q.postData() || "").slice(0, 120)); });
@@ -77,7 +78,18 @@ async function openProduct() {
 }
 
 // Datum links in der Hauptansicht wählen (dort liegt kein Fenster darüber)
+async function diag(tag) {
+  if (!DEBUG) return;
+  const info = await page.evaluate(() => [...document.querySelectorAll('button[aria-label="Open calendar"]')].map(b => {
+    const r = b.getBoundingClientRect(), cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    const top = document.elementFromPoint(cx, cy);
+    return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), inPopup: !!b.closest("sms-product-booker-popup"),
+      top: top ? top.tagName + "." + String(top.className).slice(0, 40) : null, hit: top === b || b.contains(top) };
+  }));
+  console.log("DIAG", tag, JSON.stringify(info), "modals:", await page.locator("ion-modal").count());
+}
 async function pickMainDate(label) {
+  await diag(label);
   // Buchungsfenster ist vorher geschlossen – dann gibt es nur noch den Kalender der Hauptansicht
   const tgl = page.locator('button[aria-label="Open calendar"]').first();
   await tgl.click({ timeout: 10000 });
