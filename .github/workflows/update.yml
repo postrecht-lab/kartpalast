@@ -1,8 +1,11 @@
 name: Auslastung aktualisieren
 
+# GitHub startet zeitgesteuerte Läufe nicht zuverlässig. Deshalb wird stündlich
+# ein Lauf angestoßen, der dann selbst bis zu knapp 6 Stunden aktiv bleibt und
+# alle 15 Minuten aktualisiert. Läuft schon einer, wartet der nächste.
 on:
   schedule:
-    - cron: "*/15 5-21 * * *"   # alle 15 Minuten, ca. 6–23 Uhr deutscher Zeit (UTC)
+    - cron: "7 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,18 +18,44 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 355
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Nachtpause prüfen
+        id: night
+        run: |
+          H=$(TZ=Europe/Berlin date +%-H)
+          if [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; then echo "skip=1" >> "$GITHUB_OUTPUT"; echo "Nachtpause"; fi
+      - if: steps.night.outputs.skip != '1'
+        uses: actions/checkout@v4
+      - if: steps.night.outputs.skip != '1'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-save playwright@1.56.1
-      - run: npx playwright install --with-deps chromium
-      - run: node scrape.mjs
-      - name: Daten speichern
+      - if: steps.night.outputs.skip != '1'
+        run: npm install --no-save playwright@1.56.1
+      - if: steps.night.outputs.skip != '1'
+        run: npx playwright install --with-deps chromium
+      - name: Alle 15 Minuten aktualisieren
+        if: steps.night.outputs.skip != '1'
         run: |
           git config user.name "kart-bot"
           git config user.email "kart-bot@users.noreply.github.com"
-          git add docs/data.json
-          git diff --cached --quiet || (git commit -m "Auslastung $(TZ=Europe/Berlin date +'%d.%m. %H:%M')" && git push)
+          END=$((SECONDS + 20400))
+          while [ $SECONDS -lt $END ]; do
+            H=$(TZ=Europe/Berlin date +%-H)
+            if [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; then echo "Nachtpause – Ende"; break; fi
+            START=$SECONDS
+            if node scrape.mjs; then
+              git add docs/data.json
+              if ! git diff --cached --quiet; then
+                git commit -q -m "Auslastung $(TZ=Europe/Berlin date +'%d.%m. %H:%M')"
+                git pull -q --rebase || true
+                git push -q || echo "Push fehlgeschlagen"
+              fi
+            else
+              echo "Auslese fehlgeschlagen – nächster Versuch in 15 Minuten"
+              git checkout -- docs/data.json 2>/dev/null || true
+            fi
+            WAIT=$((900 - (SECONDS - START)))
+            [ $WAIT -gt 0 ] && sleep $WAIT
+          done
