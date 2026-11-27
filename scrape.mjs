@@ -54,43 +54,66 @@ async function dismissConsent() {
 }
 await page.waitForTimeout(1500);
 await dismissConsent();
-const found = await page.waitForFunction((prod) => {
-  const a = [...document.querySelectorAll("a")].find(a => /Buche jetzt/.test(a.textContent) && a.closest("sms-product-item")?.querySelector("h1,h2,h3,h4")?.textContent.trim() === prod);
-  if (a) { a.click(); return true; }
-  return false;
-}, PRODUCT, { timeout: 30000 }).catch(() => null);
-if (!found) { console.error("Produkt nicht gefunden"); await browser.close(); process.exit(1); }
-await page.waitForTimeout(2500);
-
 const keyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const [y, m, dd] = berlin().slice(0, 10).split("-").map(Number);
 const log = [];
+
+async function closePopup() {
+  if (!(await page.locator("sms-product-booker-popup").count())) return;
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.waitForTimeout(400);
+  if (await page.locator("sms-product-booker-popup").count()) {
+    await page.locator("sms-product-booker-popup ion-header ion-button, sms-product-booker-popup ion-buttons ion-button").first().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(600);
+  }
+}
+
+async function openProduct() {
+  return page.waitForFunction((prod) => {
+    const a = [...document.querySelectorAll("a")].find(a => /Buche jetzt/.test(a.textContent) && a.closest("sms-product-item")?.querySelector("h1,h2,h3,h4")?.textContent.trim() === prod);
+    if (a) { a.click(); return true; }
+    return false;
+  }, PRODUCT, { timeout: 30000 }).then(() => true).catch(() => false);
+}
+
+// Datum links in der Hauptansicht wählen (dort liegt kein Fenster darüber)
+async function pickMainDate(label) {
+  // Buchungsfenster ist vorher geschlossen – dann gibt es nur noch den Kalender der Hauptansicht
+  const tgl = page.locator('button[aria-label="Open calendar"]').first();
+  await tgl.click({ timeout: 10000 });
+  const cal = page.locator(".mat-calendar");
+  await cal.waitFor({ state: "visible", timeout: 10000 });
+  for (let k = 0; k < 3; k++) {
+    const btn = page.locator(`.mat-calendar button[aria-label="${label}"]`);
+    if (await btn.count()) {
+      if ((await btn.getAttribute("aria-disabled")) === "true") { await page.keyboard.press("Escape"); return "gesperrt"; }
+      await btn.click({ timeout: 10000 });
+      await page.waitForTimeout(800);
+      return "ok";
+    }
+    await page.locator(".mat-calendar-next-button").click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(400);
+  }
+  await page.keyboard.press("Escape").catch(() => {});
+  return "nicht gefunden";
+}
+
 for (let i = 0; i < DAYS; i++) {
   const d = new Date(y, m - 1, dd + i);
   const key = keyOf(d), label = `${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
-  const t0 = Date.now();
-  let res = "nicht gefunden";
+  let res;
   try {
-    const cal = page.locator(".mat-calendar");
-    if (!(await cal.isVisible().catch(() => false))) {
-      await page.locator('sms-product-booker-popup button[aria-label="Open calendar"]').click({ timeout: 10000 });
-      await cal.waitFor({ state: "visible", timeout: 10000 });
-    }
-    for (let k = 0; k < 3; k++) {
-      const btn = page.locator(`.mat-calendar button[aria-label="${label}"]`);
-      if (await btn.count()) {
-        if ((await btn.getAttribute("aria-disabled")) === "true") { await page.keyboard.press("Escape"); res = "gesperrt"; break; }
-        await btn.click({ timeout: 10000 }); res = "ok"; break;
-      }
-      await page.locator(".mat-calendar-next-button").click({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(400);
+    await closePopup();
+    res = i === 0 ? "ok" : await pickMainDate(label);
+    if (res === "ok") {
+      const t0 = Date.now();
+      if (!(await openProduct())) res = "Produkt nicht gefunden";
+      else for (let w = 0; w < 60 && !(capT[key] >= t0); w++) await page.waitForTimeout(250);
     }
   } catch (e) {
     const msg = String(e.message || e);
     res = "fehler: " + ((msg.match(/<[^>]+> (?:from <[^>]+> subtree )?intercepts pointer events/) || [msg.split("\n")[0]])[0]).slice(0, 160);
-    await dismissConsent();
   }
-  if (res === "ok") { for (let w = 0; w < 40 && !(capT[key] >= t0); w++) await page.waitForTimeout(250); }
   log.push(`${key}:${res}${cap[key] ? "/" + cap[key].length : ""}`);
   if (DEBUG) { console.log("TAG", key, label, res, Object.keys(cap).join(",")); await page.screenshot({ path: `debug-${i}.png` }); }
 }
