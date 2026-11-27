@@ -6,7 +6,7 @@ import fs from "node:fs";
 
 const URL = "https://booking.sms-timing.com/teamsportkartpalast/book/product-list";
 const PRODUCT = "Grand Prix 30";
-const DAYS = 8;
+const DAYS = 1; // Der Server erhält von der Buchungsseite nur den aktuellen Tag
 const OUT = "docs/data.json";
 const MON = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 
@@ -18,8 +18,7 @@ const berlin = (d = new Date()) => {
 
 const cap = {}, capT = {};
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ locale: "de-DE", timezoneId: "Europe/Berlin", viewport: { width: 1280, height: 900 },
-  userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" });
+const ctx = await browser.newContext({ locale: "de-DE", timezoneId: "Europe/Berlin", viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
 const DEBUG = !!process.env.KART_DEBUG;
 page.on("request", (q) => { if (DEBUG && /sms-timing\.com\/api/.test(q.url())) console.log("REQ", q.method(), q.url().replace(/^https:\/\/[^/]+/, ""), (q.postData() || "").slice(0, 120)); });
@@ -142,7 +141,7 @@ const runAt = berlin(), today = runAt.slice(0, 10);
 let old = { slots: {} };
 try { old = JSON.parse(fs.readFileSync(OUT, "utf8")); } catch {}
 const slots = {};
-for (const [k, v] of Object.entries(old.slots || {})) if (k >= today) slots[k] = v;
+for (const [k, v] of Object.entries(old.slots || {})) if (k >= today && cap[k]) slots[k] = v;
 let n = 0;
 for (const [date, rows] of Object.entries(cap)) {
   if (date < today) continue;
