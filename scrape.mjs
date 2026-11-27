@@ -103,7 +103,10 @@ for (let i = 0; i < DAYS; i++) {
   const key = keyOf(d), label = `${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
   let res;
   try {
-    await closePopup();
+    if (i > 0) {
+      await page.goto(URL, { waitUntil: "networkidle", timeout: 60000 });
+      await page.waitForTimeout(1000);
+    }
     res = i === 0 ? "ok" : await pickMainDate(label);
     if (res === "ok") {
       const t0 = Date.now();
