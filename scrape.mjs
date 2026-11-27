@@ -20,8 +20,11 @@ const cap = {}, capT = {};
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ locale: "de-DE", timezoneId: "Europe/Berlin", viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
+const DEBUG = !!process.env.KART_DEBUG;
+page.on("request", (q) => { if (DEBUG && /sms-timing\.com\/api/.test(q.url())) console.log("REQ", q.method(), q.url().replace(/^https:\/\/[^/]+/, ""), (q.postData() || "").slice(0, 120)); });
 page.on("response", async (r) => {
   const u = r.url();
+  if (DEBUG && /sms-timing\.com\/api/.test(u)) console.log("RES", r.status(), u.replace(/^https:\/\/[^/]+/, ""));
   if (!/dayplanner/.test(u)) return;
   try {
     const d = await r.json();
@@ -65,6 +68,7 @@ for (let i = 0; i < DAYS; i++) {
   }, label);
   if (res === "ok") { for (let w = 0; w < 40 && !(capT[key] >= t0); w++) await page.waitForTimeout(250); }
   log.push(`${key}:${res}${cap[key] ? "/" + cap[key].length : ""}`);
+  if (DEBUG) { console.log("TAG", key, label, res, Object.keys(cap).join(",")); await page.screenshot({ path: `debug-${i}.png` }); }
 }
 await browser.close();
 console.log(log.join(" "));
