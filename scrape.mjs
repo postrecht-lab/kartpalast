@@ -51,21 +51,23 @@ for (let i = 0; i < DAYS; i++) {
   const d = new Date(y, m - 1, dd + i);
   const key = keyOf(d), label = `${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
   const t0 = Date.now();
-  const res = await page.evaluate(async (label) => {
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const tgl = document.querySelector('sms-product-booker-popup button[aria-label="Open calendar"]');
-    if (!tgl) return "kein Kalender";
-    if (!document.querySelector(".mat-calendar")) { tgl.click(); await sleep(600); }
-    for (let i = 0; i < 3; i++) {
-      const b = document.querySelector(`.mat-calendar button[aria-label="${label}"]`);
-      if (b) {
-        if (b.getAttribute("aria-disabled") === "true") { document.querySelector(".cdk-overlay-backdrop")?.click(); return "gesperrt"; }
-        b.click(); return "ok";
-      }
-      document.querySelector(".mat-calendar-next-button")?.click(); await sleep(400);
+  let res = "nicht gefunden";
+  try {
+    const cal = page.locator(".mat-calendar");
+    if (!(await cal.isVisible().catch(() => false))) {
+      await page.locator('sms-product-booker-popup button[aria-label="Open calendar"]').click({ timeout: 10000 });
+      await cal.waitFor({ state: "visible", timeout: 10000 });
     }
-    return "nicht gefunden";
-  }, label);
+    for (let k = 0; k < 3; k++) {
+      const btn = page.locator(`.mat-calendar button[aria-label="${label}"]`);
+      if (await btn.count()) {
+        if ((await btn.getAttribute("aria-disabled")) === "true") { await page.keyboard.press("Escape"); res = "gesperrt"; break; }
+        await btn.click({ timeout: 10000 }); res = "ok"; break;
+      }
+      await page.locator(".mat-calendar-next-button").click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+  } catch (e) { res = "fehler: " + String(e.message || e).split("\n")[0].slice(0, 80); }
   if (res === "ok") { for (let w = 0; w < 40 && !(capT[key] >= t0); w++) await page.waitForTimeout(250); }
   log.push(`${key}:${res}${cap[key] ? "/" + cap[key].length : ""}`);
   if (DEBUG) { console.log("TAG", key, label, res, Object.keys(cap).join(",")); await page.screenshot({ path: `debug-${i}.png` }); }
