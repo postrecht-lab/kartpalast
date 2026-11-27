@@ -104,8 +104,8 @@ details p,details li{color:var(--mut);font-size:15px;max-width:68ch}
  const hm=s=>s.slice(11,16);
 
  function days(){
-  const today=data.updated.slice(0,10);
-  const ks=Object.keys(data.slots).sort();
+  const n=new Date(),today=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  const ks=Object.keys(data.slots).sort().filter(k=>k>=today);
   if(!sel||!ks.includes(sel))sel=ks.includes(today)?today:ks[0];
   $('days').innerHTML=ks.map(k=>{const [w,d]=dlabel(k);return `<button type="button" data-d="${esc(k)}" aria-pressed="${k===sel}">${k===today?'Heute':w}<small>${d}</small></button>`}).join('');
  }
@@ -140,7 +140,8 @@ details p,details li{color:var(--mut);font-size:15px;max-width:68ch}
   const u=new Date(data.updated);
   const ageH=(Date.now()-u.getTime())/36e5;
   $('meta').innerHTML=`<span>Stand: <b>${u.getDate()}.${u.getMonth()+1}. ${hm(data.updated)} Uhr</b></span><span>Aktualisierung alle 15 Minuten</span><span>${Object.keys(data.slots).length} Tage</span>`;
-  $('warn').innerHTML=ageH>1?`<div class="warn">Die Daten sind älter als ${Math.floor(ageH*60)} Minuten – die automatische Aktualisierung läuft nachts nicht (ca. 23–6 Uhr) oder hakt gerade.</div>`:'';
+  const hr=new Date().getHours(),night=hr>=23||hr<6;
+  $('warn').innerHTML=ageH<=1?'':night?`<div class="warn" style="background:#2b2e33;color:#d6d8dc">Nachtpause: Zwischen 23 und 6 Uhr wird nicht aktualisiert. Ab 6 Uhr gibt es wieder frische Zahlen.</div>`:`<div class="warn">Die Daten sind ${ageH>=2?Math.floor(ageH)+' Stunden':Math.floor(ageH*60)+' Minuten'} alt – die automatische Aktualisierung hakt gerade.</div>`;
  }
 
  function render(){if(!data)return;meta();days();list()}
