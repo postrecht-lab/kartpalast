@@ -53,12 +53,14 @@ jobs:
             H=$(TZ=Europe/Berlin date +%-H)
             if [ "$TEST" != "true" ] && { [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; }; then echo "Nachtpause – Ende"; break; fi
             START=$SECONDS
+            # immer vom neuesten Stand ausgehen (auch manuelle Aktualisierungen der Folgetage)
+            git rebase --abort 2>/dev/null || true
+            git fetch -q origin main && git reset -q --hard origin/main
             if node scrape.mjs; then
               git add docs/data.json
               if ! git diff --cached --quiet; then
                 git commit -q -m "Auslastung $(TZ=Europe/Berlin date +'%d.%m. %H:%M')"
-                git pull -q --rebase || true
-                git push -q || echo "Push fehlgeschlagen"
+                git push -q || echo "Push fehlgeschlagen – nächster Versuch in 15 Minuten"
               fi
             else
               echo "Auslese fehlgeschlagen – nächster Versuch in 15 Minuten"
