@@ -141,7 +141,7 @@ const runAt = berlin(), today = runAt.slice(0, 10);
 let old = { slots: {} };
 try { old = JSON.parse(fs.readFileSync(OUT, "utf8")); } catch {}
 const slots = {};
-for (const [k, v] of Object.entries(old.slots || {})) if (k >= today && cap[k]) slots[k] = v;
+for (const [k, v] of Object.entries(old.slots || {})) if (k >= today) slots[k] = v; // Folgetage (per Chrome gelesen) bleiben erhalten
 let n = 0;
 for (const [date, rows] of Object.entries(cap)) {
   if (date < today) continue;
