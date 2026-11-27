@@ -90,8 +90,10 @@ async function diag(tag) {
 }
 async function pickMainDate(label) {
   await diag(label);
-  // Buchungsfenster ist vorher geschlossen – dann gibt es nur noch den Kalender der Hauptansicht
-  const tgl = page.locator('button[aria-label="Open calendar"]').first();
+  // Datumsfeld der Hauptansicht (wird erst nach dem Laden der Produkte erzeugt)
+  const tgl = page.locator("sms-date-picker mat-datepicker-toggle button").first();
+  await tgl.waitFor({ state: "visible", timeout: 30000 });
+  await diag("nach Warten");
   await tgl.click({ timeout: 10000 });
   const cal = page.locator(".mat-calendar");
   await cal.waitFor({ state: "visible", timeout: 10000 });
