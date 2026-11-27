@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kartpalast Auslastung</title>
-<meta name="description" content="Wie voll ist der Kartpalast München? Belegung Grand Prix 30 für heute und die nächsten 7 Tage, alle 15 Minuten aktualisiert.">
+<meta name="description" content="Wie voll ist der Kartpalast München? Belegung Grand Prix 30 – heute und die nächsten Tage.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Kartpalast München – Streckenauslastung">
-<meta property="og:description" content="Belegung Grand Prix 30 für heute und die nächsten 7 Tage – Raceway 1–3, alle 15 Minuten aktualisiert.">
+<meta property="og:description" content="Belegung Grand Prix 30 – heute und die nächsten Tage, Raceway 1–3.">
 <meta property="og:image" content="https://postrecht-lab.github.io/kartpalast/thumb.png">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:url" content="https://postrecht-lab.github.io/kartpalast/">
@@ -80,7 +80,7 @@ details p,details li{color:var(--mut);font-size:15px;max-width:68ch}
  <div class="list" id="list"><div class="empty">Lade Daten …</div></div>
  <div class="legend"><span><i style="background:var(--ok)"></i>unter 60 %</span><span><i style="background:var(--mid)"></i>60–89 %</span><span><i style="background:var(--hi)"></i>ab 90 %</span><span>Durchgestrichen: nicht mehr buchbar</span><span>* Strecke vermutet, noch nicht bestätigt</span></div>
  <details><summary>So entstehen die Zahlen</summary>
-  <p>Alle 15 Minuten wird automatisch die öffentliche Online-Buchung des Kartpalast (SMS-Timing) für heute und die nächsten 7 Tage ausgelesen. Neu laden der Seite zeigt nur den zuletzt gespeicherten Stand – oben steht, von wann er ist. „Gebucht“ ist die Kapazität eines Laufs minus der dort angezeigten freien Plätze.</p>
+  <p>Für heute wird alle 15 Minuten automatisch die öffentliche Online-Buchung des Kartpalast (SMS-Timing) ausgelesen; die nächsten Tage werden bei Gelegenheit nachgetragen – der jeweilige Stand steht über jedem Tag. Neu laden der Seite zeigt nur den zuletzt gespeicherten Stand – oben steht, von wann er ist. „Gebucht“ ist die Kapazität eines Laufs minus der dort angezeigten freien Plätze.</p>
   <ul>
    <li>Ausgebuchte Läufe zeigt das Buchungssystem nicht an. War ein Lauf früher sichtbar und fehlt jetzt, erscheint er durchgestrichen mit dem letzten bekannten Stand.</li>
    <li>Lücken zwischen den Läufen (schraffiert): Dort wurde nie ein buchbarer Lauf angeboten – entweder ausgebucht oder kein Lauf geplant.</li>
@@ -112,19 +112,21 @@ details p,details li{color:var(--mut);font-size:15px;max-width:68ch}
 
  function list(){
   const day=data.slots[sel]||{},upd=data.updated;
+  const dayUpd=Object.values(day).reduce((m,v)=>v[2]>m?v[2]:m,'');
   const rows=Object.entries(day).map(([k,v])=>{const [t,id]=k.split('|');return {t,id,cap:v[0],free:v[1],seen:v[2]}}).sort((a,b)=>a.t<b.t?-1:a.t>b.t?1:0);
   if(!rows.length){$('list').innerHTML='<div class="empty">Für diesen Tag sind keine Läufe bekannt.</div>';$('sums').innerHTML='';return}
   const per={};
   rows.forEach(r=>{const k=trackOf(r.id);per[k]=per[k]||[0,0,0];per[k][0]+=noteOf(r.t,r.id)?r.cap:r.cap-r.free;per[k][1]+=r.cap;per[k][2]++});
   const tot=rows.reduce((a,r)=>[a[0]+(noteOf(r.t,r.id)?r.cap:r.cap-r.free),a[1]+r.cap],[0,0]);
-  $('sums').innerHTML=`<div class="sum"><div class="t">Gesamt</div><div class="v"><b>${tot[0]}</b> / ${tot[1]} gebucht · ${rows.length} Läufe</div></div>`+
+  const du=dayUpd?new Date(dayUpd):null,stale=du&&(Date.now()-du.getTime())>36e5*3;
+  $('sums').innerHTML=(du?`<div class="sum" style="grid-column:1/-1;${stale?'border-color:var(--mid)':''}"><div class="v">Stand für diesen Tag: <b style="font-size:16px">${du.getDate()}.${du.getMonth()+1}. ${hm(dayUpd)} Uhr</b>${stale?' – älter als 3 Stunden':''}</div></div>`:'')+`<div class="sum"><div class="t">Gesamt</div><div class="v"><b>${tot[0]}</b> / ${tot[1]} gebucht · ${rows.length} Läufe</div></div>`+
    Object.keys(per).sort().map(k=>`<div class="sum"><div class="t">${esc(k)}</div><div class="v"><b>${per[k][0]}</b> / ${per[k][1]} · ${per[k][2]} Läufe</div></div>`).join('');
   const toMin=t=>+t.slice(0,2)*60+ +t.slice(3);
   let html='',prev=null;
   rows.forEach(r=>{
    if(prev!==null){for(let m=toMin(prev)+30;m<toMin(r.t);m+=30){const t=String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');if(!rows.some(x=>x.t===t))html+=`<div class="row gap"><div class="time">${t}</div><div>kein buchbarer Lauf – ausgebucht oder nicht geplant</div></div>`}}
    prev=r.t;
-   const note=noteOf(r.t,r.id),free=note?0:r.free,b=r.cap-free,p=r.cap?b/r.cap:0,cur=r.seen===upd,started=(sel+'T'+r.t)<upd;
+   const note=noteOf(r.t,r.id),free=note?0:r.free,b=r.cap-free,p=r.cap?b/r.cap:0,cur=r.seen===dayUpd,started=(sel+'T'+r.t)<upd;
    let cls='',st='';
    if(!cur&&started){cls='old';st='gestartet · letzter Stand '+hm(r.seen)+' Uhr'}
    else if(!cur){cls='gone';st='nicht mehr buchbar – vermutlich ausgebucht · Stand '+hm(r.seen)+' Uhr'}
@@ -139,7 +141,7 @@ details p,details li{color:var(--mut);font-size:15px;max-width:68ch}
  function meta(){
   const u=new Date(data.updated);
   const ageH=(Date.now()-u.getTime())/36e5;
-  $('meta').innerHTML=`<span>Stand: <b>${u.getDate()}.${u.getMonth()+1}. ${hm(data.updated)} Uhr</b></span><span>Aktualisierung alle 15 Minuten</span><span>${Object.keys(data.slots).length} Tage</span>`;
+  $('meta').innerHTML=`<span>Stand: <b>${u.getDate()}.${u.getMonth()+1}. ${hm(data.updated)} Uhr</b></span><span>Heute: alle 15 Minuten aktualisiert</span><span>${Object.keys(data.slots).length} Tage</span>`;
   const hr=new Date().getHours(),night=hr>=23||hr<6;
   $('warn').innerHTML=ageH<=1?'':night?`<div class="warn" style="background:#2b2e33;color:#d6d8dc">Nachtpause: Zwischen 23 und 6 Uhr wird nicht aktualisiert. Ab 6 Uhr gibt es wieder frische Zahlen.</div>`:`<div class="warn">Die Daten sind ${ageH>=2?Math.floor(ageH)+' Stunden':Math.floor(ageH*60)+' Minuten'} alt – die automatische Aktualisierung hakt gerade.</div>`;
  }
