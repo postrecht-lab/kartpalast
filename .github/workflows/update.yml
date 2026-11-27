@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "7 * * * *"
   workflow_dispatch:
+    inputs:
+      test:
+        description: "Testlauf (einmal, auch nachts, mit Fehlersuche)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,7 +29,7 @@ jobs:
         id: night
         run: |
           H=$(TZ=Europe/Berlin date +%-H)
-          if [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; then echo "skip=1" >> "$GITHUB_OUTPUT"; echo "Nachtpause"; fi
+          if [ "${{ inputs.test }}" != "true" ] && { [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; }; then echo "skip=1" >> "$GITHUB_OUTPUT"; echo "Nachtpause"; fi
       - if: steps.night.outputs.skip != '1'
         uses: actions/checkout@v4
       - if: steps.night.outputs.skip != '1'
@@ -37,13 +42,16 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Alle 15 Minuten aktualisieren
         if: steps.night.outputs.skip != '1'
+        env:
+          TEST: ${{ inputs.test }}
+          KART_DEBUG: ${{ inputs.test && '1' || '' }}
         run: |
           git config user.name "kart-bot"
           git config user.email "kart-bot@users.noreply.github.com"
           END=$((SECONDS + 20400))
           while [ $SECONDS -lt $END ]; do
             H=$(TZ=Europe/Berlin date +%-H)
-            if [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; then echo "Nachtpause – Ende"; break; fi
+            if [ "$TEST" != "true" ] && { [ "$H" -ge 23 ] || [ "$H" -lt 6 ]; }; then echo "Nachtpause – Ende"; break; fi
             START=$SECONDS
             if node scrape.mjs; then
               git add docs/data.json
@@ -56,6 +64,14 @@ jobs:
               echo "Auslese fehlgeschlagen – nächster Versuch in 15 Minuten"
               git checkout -- docs/data.json 2>/dev/null || true
             fi
+            [ "$TEST" = "true" ] && break
             WAIT=$((900 - (SECONDS - START)))
             [ $WAIT -gt 0 ] && sleep $WAIT
           done
+      - name: Fehlersuche-Bilder
+        if: inputs.test && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug
+          path: debug-*.png
+          if-no-files-found: ignore
